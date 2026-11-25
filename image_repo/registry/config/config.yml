@@ -1,0 +1,153 @@
+# config.yml
+version: 0.1
+
+# 📝 日志配置
+log:
+  level: info                    # debug/info/warn/error
+  formatter: text                # text/json/logstash
+  fields:
+    service: registry
+    environment: production
+  accesslog:
+    disabled: false              # 是否禁用访问日志
+
+# proxy:
+#   remoteurl: https://registry-1.docker.io  # Docker Hub
+#   ttl: 168h  # 缓存 7 天
+
+# 💾 存储配置（必选，只能选一种）
+storage:
+  filesystem:                    # 本地文件系统（开发用）
+    rootdirectory: /var/lib/registry
+    maxthreads: 100
+  # 生产环境推荐云存储（见第三节）
+  
+  # 启用镜像删除（垃圾回收必需）
+  delete:
+    enabled: true
+  
+  # # 缓存层元数据（提升性能）
+  # cache:
+  #   blobdescriptor: redis        # 或 inmemory
+  
+  # 维护任务
+  maintenance:
+    uploadpurging:               # 清理未完成上传
+      enabled: true
+      age: 168h                  # 7天前的上传记录
+      interval: 24h
+      dryrun: false
+    readonly:                    # 只读模式（维护时用）
+      enabled: false
+
+# storage:
+#   s3:
+#     accesskey: ${AWS_ACCESS_KEY}      # 建议用环境变量
+#     secretkey: ${AWS_SECRET_KEY}
+#     region: us-east-1
+#     bucket: my-docker-registry
+#     rootdirectory: /registry          # S3 内路径前缀
+#     encrypt: true                     # 服务端加密
+#     secure: true                      # 使用 HTTPS
+#     v4auth: true                      # 使用 SigV4 签名
+#     chunksize: 5242880                # 分片上传大小(5MB+)
+  
+#   delete:
+#     enabled: true
+#   cache:
+#     blobdescriptor: redis             # 用 Redis 缓存元数据
+#   redirect:
+#     disable: false                    # 允许直连 S3 下载（加速）
+
+# # docker-compose.yml 片段
+# services:
+#   minio:
+#     image: minio/minio
+#     command: server /data --console-address :9001
+#     environment:
+#       MINIO_ROOT_USER: admin
+#       MINIO_ROOT_PASSWORD: minioadmin123
+#     volumes:
+#       - minio-/data
+#     ports:
+#       - "9000:9000"
+#       - "9001:9001"
+
+#   registry:
+#     image: registry:2
+#     environment:
+#       REGISTRY_STORAGE: s3
+#       REGISTRY_STORAGE_S3_ACCESSKEY: admin
+#       REGISTRY_STORAGE_S3_SECRETKEY: minioadmin123
+#       REGISTRY_STORAGE_S3_REGION: us-east-1
+#       REGISTRY_STORAGE_S3_BUCKET: registry
+#       REGISTRY_STORAGE_S3_REGIONENDPOINT: http://minio:9000  # ⚠️ 指向 MinIO
+#       REGISTRY_STORAGE_S3_FORCEPATHSTYLE: true               # ⚠️ MinIO 必需
+#       REGISTRY_STORAGE_S3_SECURE: false                      # HTTP 测试用
+#     depends_on:
+#       - minio
+
+# 🔐 认证配置（三选一）
+auth:
+  # 方案1: htpasswd 基础认证（简单场景）
+  htpasswd:
+    realm: Docker Realm
+    path: /auth/htpasswd
+  
+  # 方案2: Token 认证（企业级，需外部 Auth Server）
+  # token:
+  #   realm: https://auth.example.com/token
+  #   service: docker-registry
+  #   issuer: auth.example.com
+  #   rootcertbundle: /certs/auth.crt
+
+# 🌐 HTTP 服务器配置
+http:
+  addr: 0.0.0.0:5001                  # 监听地址
+  
+  # # TLS 配置（生产必配）
+  # tls:
+  #   certificate: /certs/registry.crt
+  #   key: /certs/registry.key
+  #   minimumtls: tls1.2
+  #   ciphersuites:
+  #     - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+  
+  # # 调试端点（含 Prometheus 指标）
+  # debug:
+  #   addr: :5001
+  #   prometheus:
+  #     enabled: true
+  #     path: /metrics
+  
+  # 安全头
+  headers:
+    X-Content-Type-Options: [nosniff]
+
+# 🔄 Redis 缓存（可选但推荐）
+redis:
+  addr: redis:6379
+  password: ${REDIS_PASSWORD}
+  db: 0
+  pool:
+    maxidle: 16
+    maxactive: 64
+    idletimeout: 300s
+
+# 🏥 健康检查
+health:
+  storagedriver:
+    enabled: true
+    interval: 10s
+    threshold: 3
+
+# # 🔔 Webhook 通知（可选）
+# notifications:
+#   endpoints:
+#     - name: ci-webhook
+#       url: https://ci.example.com/registry-events
+#       headers:
+#         Authorization: [Bearer your-token]
+#       timeout: 1s
+#       threshold: 5
+#       backoff: 1s
